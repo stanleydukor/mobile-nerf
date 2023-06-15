@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Canvas, useFrame, useThree, extend } from "@react-three/fiber";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader";
 import { useLoader } from "@react-three/fiber";
@@ -20,32 +20,44 @@ import {
 } from "three";
 import { OrbitControls } from "@react-three/drei";
 import { vertexShader, fragmentShader, renderer } from "./components/shaders";
-import OBJ0 from "./src/shape0_0.obj";
-import OBJ1 from "./src/shape0_1.obj";
-import OBJ2 from "./src/shape0_2.obj";
-import OBJ3 from "./src/shape0_3.obj";
-import OBJ4 from "./src/shape0_4.obj";
-import OBJ5 from "./src/shape0_5.obj";
-import OBJ6 from "./src/shape0_6.obj";
-import OBJ7 from "./src/shape0_7.obj";
-import PNG0 from "./src/shape0.pngfeat0.png";
-import PNG1 from "./src/shape0.pngfeat1.png";
-import json from "./src/mlp.json";
-import "./App.css";
 import createViewDependenceFunctions from "./components/createViewDependence";
 import createNetworkWeightTexture from "./components/createNetworkWeightTexture";
+import { getFileTypes } from "./components/utils";
+import MIC from "./config/mic";
+import AppStyle from "./style";
+import Header from "./views/header";
+import Footer from "./views/footer";
 
-const network_weights = json;
-const fragmentShaderSource = createViewDependenceFunctions(network_weights);
-const weightsTexZero = createNetworkWeightTexture(network_weights["0_weights"]);
-const weightsTexOne = createNetworkWeightTexture(network_weights["1_weights"]);
-const weightsTexTwo = createNetworkWeightTexture(network_weights["2_weights"]);
+import {
+  List,
+  ListItemIcon,
+  ListItemText,
+  ListItemButton,
+  Avatar,
+} from "@mui/material";
+import ImageIcon from "@mui/icons-material/Image";
+
+import Switch from "@mui/material/Switch";
+import FormGroup from "@mui/material/FormGroup";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import FormControl from "@mui/material/FormControl";
 
 extend({ OBJLoader });
 
-function PostProcessingScene() {
+function PostProcessingScene({ jsonFile }) {
   const { gl, scene, camera, size } = useThree();
   const renderTargetRef = useRef();
+  const network_weights = jsonFile;
+  const fragmentShaderSource = createViewDependenceFunctions(network_weights);
+  const weightsTexZero = createNetworkWeightTexture(
+    network_weights["0_weights"]
+  );
+  const weightsTexOne = createNetworkWeightTexture(
+    network_weights["1_weights"]
+  );
+  const weightsTexTwo = createNetworkWeightTexture(
+    network_weights["2_weights"]
+  );
 
   if (!renderTargetRef.current) {
     renderTargetRef.current = new WebGLMultipleRenderTargets(
@@ -115,50 +127,36 @@ function PostProcessingScene() {
   return null;
 }
 
-const MyScene = () => {
-  // Load the OBJ files using the OBJLoader
-  const model1 = useLoader(OBJLoader, OBJ0);
-  const model2 = useLoader(OBJLoader, OBJ1);
-  const model3 = useLoader(OBJLoader, OBJ2);
-  const model4 = useLoader(OBJLoader, OBJ3);
-  const model5 = useLoader(OBJLoader, OBJ4);
-  const model6 = useLoader(OBJLoader, OBJ5);
-  const model7 = useLoader(OBJLoader, OBJ6);
-  const model8 = useLoader(OBJLoader, OBJ7);
+const MyScene = ({ objFiles, pngFiles, params }) => {
+  const objs = objFiles.map((path) => useLoader(OBJLoader, path));
+  const textures = pngFiles.map((path) => {
+    const texture = new TextureLoader().load(path);
+    texture.magFilter = NearestFilter;
+    texture.minFilter = NearestFilter;
+    return texture;
+  });
 
-  // Load the PNG textures using the TextureLoader
-  const texture1 = new TextureLoader().load(PNG0);
-  texture1.magFilter = NearestFilter;
-  texture1.minFilter = NearestFilter;
-  const texture2 = new TextureLoader().load(PNG1);
-  texture2.magFilter = NearestFilter;
-  texture2.minFilter = NearestFilter;
+  const uniforms = textures.reduce((acc, curr, idx) => {
+    acc[`tDiffuse${idx}`] = { value: curr };
+    return acc;
+  }, {});
 
   let newmat = new RawShaderMaterial({
     side: DoubleSide,
     vertexShader: vertexShader,
     fragmentShader: fragmentShader,
-    uniforms: {
-      tDiffuse0: { value: texture1 },
-      tDiffuse1: { value: texture2 },
-    },
+    uniforms,
     glslVersion: GLSL3,
   });
 
-  // Create a group to combine the models
   const group = new Group();
-  group.add(model1.children[0]);
-  group.add(model2.children[0]);
-  group.add(model3.children[0]);
-  group.add(model4.children[0]);
-  group.add(model5.children[0]);
-  group.add(model6.children[0]);
-  group.add(model7.children[0]);
-  group.add(model8.children[0]);
-
-  // Apply textures to the models in the group
+  objs.forEach((model) => {
+    if (model.children.length > 0) {
+      group.add(model.children[0]);
+    }
+  });
   group.children.forEach((child) => {
-    if (child instanceof Mesh) {
+    if (child instanceof Mesh && params.feature) {
       child.material = newmat;
     }
   });
@@ -170,15 +168,133 @@ const MyScene = () => {
   );
 };
 
+const imageList = [
+  { id: 1, src: "https://picsum.photos/200", title: "Image 1" },
+  { id: 2, src: "https://picsum.photos/200", title: "Image 2" },
+  { id: 3, src: "https://picsum.photos/200", title: "Image 3" },
+  { id: 4, src: "https://picsum.photos/200", title: "Image 4" },
+  { id: 5, src: "https://picsum.photos/200", title: "Image 5" },
+  { id: 6, src: "https://picsum.photos/200", title: "Image 6" },
+];
+
 function App() {
+  const [objFiles, setObjFIles] = useState(null);
+  const [pngFiles, setPngFIles] = useState(null);
+  const [jsonFile, setJsonFile] = useState(null);
+  const [renderFiles, setRenderFiles] = useState(MIC);
+  const [params, setParams] = useState({
+    mesh: true,
+    feature: true,
+    output: true,
+    aliasing: true,
+  });
+  const renderObject = (renderFiles) => {
+    let [objFiles, pngFiles, jsonFile] = getFileTypes(renderFiles);
+    setObjFIles(objFiles);
+    setPngFIles(pngFiles);
+    setJsonFile(jsonFile);
+  };
+  useEffect(() => renderObject(renderFiles), [renderFiles]);
+  if (!objFiles || !pngFiles || !jsonFile) {
+    return <div>Loading...</div>;
+  }
+  const handleChange = (e) => {
+    let { name, checked } = e.target;
+    if (name === "mesh" && checked === false) {
+      setParams({
+        ...params,
+        mesh: false,
+        feature: false,
+        output: false,
+        aliasing: false,
+      });
+    } else {
+      setParams({
+        ...params,
+        [name]: checked,
+      });
+    }
+  };
   return (
-    <Canvas style={{ width: 1000, height: 1000 }}>
-      <ambientLight />
-      <pointLight position={[10, 10, 10]} />
-      <MyScene />
-      <OrbitControls autoRotate enableZoom={false} enablePan={false} />
-      <PostProcessingScene />
-    </Canvas>
+    <AppStyle>
+      <Header />
+      <div className="content">
+        <div className="side-content">
+          <List>
+            {imageList.map((image) => (
+              <ListItemButton key={image.id} sx={{ minWidth: "150px" }}>
+                <ListItemIcon>
+                  <Avatar variant="square" src={image.src}>
+                    <ImageIcon />
+                  </Avatar>
+                </ListItemIcon>
+                <ListItemText primary={image.title} />
+              </ListItemButton>
+            ))}
+          </List>
+        </div>
+        <div className="main-content">
+          <div className="canvas">
+            <Canvas
+              gl={{
+                powerPreference: "high-performance",
+                precision: "highp",
+                antialias: false,
+              }}
+              onCreated={({ gl }) => {
+                gl.setClearColor(new Color("rgb(0, 0, 0)"), 0.5);
+              }}
+            >
+              <ambientLight />
+              <pointLight position={[10, 10, 10]} />
+              <MyScene
+                objFiles={objFiles}
+                pngFiles={pngFiles}
+                params={params}
+              />
+              <OrbitControls autoRotate enableZoom={false} enablePan={false} />
+              <PostProcessingScene jsonFile={jsonFile} params={params} />
+            </Canvas>
+          </div>
+          <div className="controls">
+            <FormControl component="fieldset">
+              <FormGroup aria-label="position" row>
+                <FormControlLabel
+                  name="mesh"
+                  onChange={handleChange}
+                  control={<Switch defaultChecked color="primary" />}
+                  label="Mesh"
+                  labelPlacement="start"
+                />
+                <FormControlLabel
+                  name="feature"
+                  onChange={handleChange}
+                  control={<Switch defaultChecked color="primary" />}
+                  label="Feature Image"
+                  labelPlacement="start"
+                />
+                <FormControlLabel
+                  name="output"
+                  onChange={handleChange}
+                  control={<Switch defaultChecked color="primary" />}
+                  label="Final Output"
+                  labelPlacement="start"
+                />
+                <FormControlLabel
+                  name="alising"
+                  onChange={handleChange}
+                  control={<Switch defaultChecked color="primary" />}
+                  label="Anti-aliasing"
+                  labelPlacement="start"
+                />
+              </FormGroup>
+            </FormControl>
+          </div>
+        </div>
+      </div>
+
+      <Footer />
+    </AppStyle>
   );
 }
 
