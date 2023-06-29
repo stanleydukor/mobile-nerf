@@ -26,7 +26,7 @@ import createNetworkWeightTexture from "../components/createNetworkWeightTexture
 
 extend({ OBJLoader });
 
-function PostProcessingScene({ jsonFile, params, renderTargetRef }) {
+function PostProcessingScene({ jsonFile, renderTargetRef }) {
   const { gl, scene, camera } = useThree();
   const network_weights = jsonFile;
   const fragmentShaderSource = createViewDependenceFunctions(network_weights);
@@ -192,11 +192,12 @@ function Viewer() {
           renderTargetRef={renderTargetRef}
         />
         <OrbitControls autoRotate enableZoom={false} enablePan={false} />
-        <PostProcessingScene
-          jsonFile={jsonFile}
-          params={params}
-          renderTargetRef={renderTargetRef}
-        />
+        {params.output ? (
+          <PostProcessingScene
+            jsonFile={jsonFile}
+            renderTargetRef={renderTargetRef}
+          />
+        ) : null}
       </Suspense>
     </Canvas>
   );
