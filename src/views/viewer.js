@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useMemo } from "react";
+import { connect } from "react-redux";
+import { selectors as viewerSelectors } from "../store/viewer";
 import { Canvas, useFrame, useThree, extend } from "@react-three/fiber";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader";
 import { useLoader } from "@react-three/fiber";
@@ -180,4 +182,11 @@ function Viewer({ objFiles, pngFiles, jsonFile, params }) {
   );
 }
 
-export default Viewer;
+const mapStateToProps = (state) => ({
+  objFiles: viewerSelectors.objFiles(state),
+  pngFiles: viewerSelectors.pngFiles(state),
+  jsonFile: viewerSelectors.jsonFile(state),
+  params: viewerSelectors.params(state),
+});
+
+export default connect(mapStateToProps, null)(Viewer);

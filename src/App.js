@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from "react";
-import { getFileTypes } from "./components/utils";
+import React, { useEffect } from "react";
+import { connect } from "react-redux";
+import { viewerActions } from "./store/viewer";
+import { selectors as viewerSelectors } from "./store/viewer";
 import MIC from "./config/mic";
 import AppStyle from "./style";
 import Header from "./views/header";
@@ -29,41 +31,10 @@ const imageList = [
   { id: 6, src: "https://picsum.photos/200", title: "Image 6" },
 ];
 
-function App() {
-  const [objFiles, setObjFIles] = useState(null);
-  const [pngFiles, setPngFIles] = useState(null);
-  const [jsonFile, setJsonFile] = useState(null);
-  const [renderFiles, setRenderFiles] = useState(MIC);
-  const [params, setParams] = useState({
-    mesh: true,
-    feature: true,
-    output: true,
-    aliasing: true,
-  });
-  const handleChange = (e) => {
-    let { name, checked } = e.target;
-    if (name === "mesh" && checked === false) {
-      setParams({
-        ...params,
-        mesh: false,
-        feature: false,
-        output: false,
-        aliasing: false,
-      });
-    } else {
-      setParams({
-        ...params,
-        [name]: checked,
-      });
-    }
-  };
-  const renderObject = (renderFiles) => {
-    let [objFiles, pngFiles, jsonFile] = getFileTypes(renderFiles);
-    setObjFIles(objFiles);
-    setPngFIles(pngFiles);
-    setJsonFile(jsonFile);
-  };
-  useEffect(() => renderObject(renderFiles), [renderFiles]);
+function App({ objFiles, pngFiles, jsonFile, params, addFiles, handleChange }) {
+  useEffect(() => {
+    addFiles(MIC);
+  }, []);
   if (!objFiles || !pngFiles || !jsonFile) {
     return <div>Loading...</div>;
   }
@@ -87,12 +58,7 @@ function App() {
         </div>
         <div className="main-content">
           <div className="canvas">
-            <Viewer
-              objFiles={objFiles}
-              pngFiles={pngFiles}
-              jsonFile={jsonFile}
-              params={params}
-            />
+            <Viewer />
           </div>
           <div className="controls">
             <FormControl component="fieldset">
@@ -103,6 +69,7 @@ function App() {
                   control={<Switch defaultChecked color="primary" />}
                   label="Mesh"
                   labelPlacement="start"
+                  checked={params.mesh}
                 />
                 <FormControlLabel
                   name="feature"
@@ -110,6 +77,7 @@ function App() {
                   control={<Switch defaultChecked color="primary" />}
                   label="Feature Image"
                   labelPlacement="start"
+                  checked={params.feature}
                 />
                 <FormControlLabel
                   name="output"
@@ -117,6 +85,7 @@ function App() {
                   control={<Switch defaultChecked color="primary" />}
                   label="Final Output"
                   labelPlacement="start"
+                  checked={params.output}
                 />
                 <FormControlLabel
                   name="aliasing"
@@ -124,6 +93,7 @@ function App() {
                   control={<Switch defaultChecked color="primary" />}
                   label="Anti-aliasing"
                   labelPlacement="start"
+                  checked={params.aliasing}
                 />
               </FormGroup>
             </FormControl>
@@ -136,4 +106,16 @@ function App() {
   );
 }
 
-export default App;
+const mapStateToProps = (state) => ({
+  objFiles: viewerSelectors.objFiles(state),
+  pngFiles: viewerSelectors.pngFiles(state),
+  jsonFile: viewerSelectors.jsonFile(state),
+  params: viewerSelectors.params(state),
+});
+
+const mapDispatchToProps = {
+  addFiles: viewerActions.addFiles,
+  handleChange: viewerActions.handleChange,
+};
+
+export default connect(mapStateToProps, mapDispatchToProps)(App);
