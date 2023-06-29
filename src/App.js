@@ -44,9 +44,8 @@ import FormControl from "@mui/material/FormControl";
 
 extend({ OBJLoader });
 
-function PostProcessingScene({ jsonFile }) {
-  const { gl, scene, camera, size } = useThree();
-  const renderTargetRef = useRef();
+function PostProcessingScene({ jsonFile, params, renderTargetRef }) {
+  const { gl, scene, camera } = useThree();
   const network_weights = jsonFile;
   const fragmentShaderSource = createViewDependenceFunctions(network_weights);
   const weightsTexZero = createNetworkWeightTexture(
@@ -58,23 +57,6 @@ function PostProcessingScene({ jsonFile }) {
   const weightsTexTwo = createNetworkWeightTexture(
     network_weights["2_weights"]
   );
-
-  if (!renderTargetRef.current) {
-    renderTargetRef.current = new WebGLMultipleRenderTargets(
-      size.width,
-      size.height,
-      3
-    );
-    for (let i = 0, il = renderTargetRef.current.texture.length; i < il; i++) {
-      renderTargetRef.current.texture[i].minFilter = LinearFilter;
-      renderTargetRef.current.texture[i].magFilter = LinearFilter;
-      renderTargetRef.current.texture[i].type = FloatType;
-    }
-  }
-
-  useEffect(() => {
-    renderTargetRef.current.setSize(size.width, size.height);
-  }, [size]);
 
   // Create a new scene for post-processing
   const postScene = useMemo(() => new Scene(), []);
@@ -127,7 +109,24 @@ function PostProcessingScene({ jsonFile }) {
   return null;
 }
 
-const MyScene = ({ objFiles, pngFiles, params }) => {
+const MyScene = ({ objFiles, pngFiles, params, renderTargetRef }) => {
+  const { size } = useThree();
+  if (!renderTargetRef.current) {
+    renderTargetRef.current = new WebGLMultipleRenderTargets(
+      size.width * 2,
+      size.height * 2,
+      3
+    );
+    for (let i = 0, il = renderTargetRef.current.texture.length; i < il; i++) {
+      renderTargetRef.current.texture[i].minFilter = LinearFilter;
+      renderTargetRef.current.texture[i].magFilter = LinearFilter;
+      renderTargetRef.current.texture[i].type = FloatType;
+    }
+  }
+  useEffect(() => {
+    renderTargetRef.current.setSize(size.width * 2, size.height * 2);
+  }, [size]);
+
   const objs = objFiles.map((path) => useLoader(OBJLoader, path));
   const textures = pngFiles.map((path) => {
     const texture = new TextureLoader().load(path);
@@ -178,6 +177,7 @@ const imageList = [
 ];
 
 function App() {
+  const renderTargetRef = useRef();
   const [objFiles, setObjFIles] = useState(null);
   const [pngFiles, setPngFIles] = useState(null);
   const [jsonFile, setJsonFile] = useState(null);
@@ -188,16 +188,6 @@ function App() {
     output: true,
     aliasing: true,
   });
-  const renderObject = (renderFiles) => {
-    let [objFiles, pngFiles, jsonFile] = getFileTypes(renderFiles);
-    setObjFIles(objFiles);
-    setPngFIles(pngFiles);
-    setJsonFile(jsonFile);
-  };
-  useEffect(() => renderObject(renderFiles), [renderFiles]);
-  if (!objFiles || !pngFiles || !jsonFile) {
-    return <div>Loading...</div>;
-  }
   const handleChange = (e) => {
     let { name, checked } = e.target;
     if (name === "mesh" && checked === false) {
@@ -215,6 +205,16 @@ function App() {
       });
     }
   };
+  const renderObject = (renderFiles) => {
+    let [objFiles, pngFiles, jsonFile] = getFileTypes(renderFiles);
+    setObjFIles(objFiles);
+    setPngFIles(pngFiles);
+    setJsonFile(jsonFile);
+  };
+  useEffect(() => renderObject(renderFiles), [renderFiles]);
+  if (!objFiles || !pngFiles || !jsonFile) {
+    return <div>Loading...</div>;
+  }
   return (
     <AppStyle>
       <Header />
@@ -239,7 +239,8 @@ function App() {
               gl={{
                 powerPreference: "high-performance",
                 precision: "highp",
-                antialias: false,
+                antialias: !params.aliasing,
+                pixelRatio: 1,
               }}
               onCreated={({ gl }) => {
                 gl.setClearColor(new Color("rgb(0, 0, 0)"), 0.5);
@@ -251,9 +252,14 @@ function App() {
                 objFiles={objFiles}
                 pngFiles={pngFiles}
                 params={params}
+                renderTargetRef={renderTargetRef}
               />
               <OrbitControls autoRotate enableZoom={false} enablePan={false} />
-              <PostProcessingScene jsonFile={jsonFile} params={params} />
+              <PostProcessingScene
+                jsonFile={jsonFile}
+                params={params}
+                renderTargetRef={renderTargetRef}
+              />
             </Canvas>
           </div>
           <div className="controls">
@@ -281,7 +287,7 @@ function App() {
                   labelPlacement="start"
                 />
                 <FormControlLabel
-                  name="alising"
+                  name="aliasing"
                   onChange={handleChange}
                   control={<Switch defaultChecked color="primary" />}
                   label="Anti-aliasing"
