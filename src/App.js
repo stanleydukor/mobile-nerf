@@ -64,36 +64,52 @@ function App({ objFiles, pngFiles, jsonFile, params, addFiles, handleChange }) {
             <FormControl component="fieldset">
               <FormGroup aria-label="position" row>
                 <FormControlLabel
-                  name="mesh"
-                  onChange={handleChange}
-                  control={<Switch defaultChecked color="primary" />}
+                  control={
+                    <Switch
+                      name="mesh"
+                      onChange={handleChange}
+                      checked={params.mesh}
+                      color="primary"
+                    />
+                  }
                   label="Mesh"
                   labelPlacement="start"
-                  checked={params.mesh}
                 />
                 <FormControlLabel
-                  name="feature"
-                  onChange={handleChange}
-                  control={<Switch defaultChecked color="primary" />}
+                  control={
+                    <Switch
+                      name="feature"
+                      onChange={handleChange}
+                      checked={params.feature}
+                      color="primary"
+                    />
+                  }
                   label="Feature Image"
                   labelPlacement="start"
-                  checked={params.feature}
                 />
                 <FormControlLabel
-                  name="output"
-                  onChange={handleChange}
-                  control={<Switch defaultChecked color="primary" />}
+                  control={
+                    <Switch
+                      name="output"
+                      onChange={handleChange}
+                      checked={params.output}
+                      color="primary"
+                    />
+                  }
                   label="Final Output"
                   labelPlacement="start"
-                  checked={params.output}
                 />
                 <FormControlLabel
-                  name="aliasing"
-                  onChange={handleChange}
-                  control={<Switch defaultChecked color="primary" />}
+                  control={
+                    <Switch
+                      name="aliasing"
+                      onChange={handleChange}
+                      checked={params.aliasing}
+                      color="primary"
+                    />
+                  }
                   label="Anti-aliasing"
                   labelPlacement="start"
-                  checked={params.aliasing}
                 />
               </FormGroup>
             </FormControl>
