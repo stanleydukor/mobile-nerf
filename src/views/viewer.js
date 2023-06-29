@@ -1,11 +1,9 @@
-import React, { useEffect, useRef, useMemo } from "react";
-import { connect } from "react-redux";
+import React, { useEffect, useRef, useMemo, Suspense, useState } from "react";
+import { useSelector } from "react-redux";
 import { selectors as viewerSelectors } from "../store/viewer";
 import { Canvas, useFrame, useThree, extend } from "@react-three/fiber";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader";
-import { useLoader } from "@react-three/fiber";
 import {
-  Group,
   TextureLoader,
   RawShaderMaterial,
   DoubleSide,
@@ -19,8 +17,9 @@ import {
   WebGLMultipleRenderTargets,
   LinearFilter,
   FloatType,
+  MeshStandardMaterial,
 } from "three";
-import { OrbitControls } from "@react-three/drei";
+import { OrbitControls, Html, useProgress } from "@react-three/drei";
 import { vertexShader, fragmentShader, renderer } from "../components/shaders";
 import createViewDependenceFunctions from "../components/createViewDependence";
 import createNetworkWeightTexture from "../components/createNetworkWeightTexture";
@@ -93,7 +92,12 @@ function PostProcessingScene({ jsonFile, params, renderTargetRef }) {
 }
 
 const MyScene = ({ objFiles, pngFiles, params, renderTargetRef }) => {
-  const { size } = useThree();
+  const { size, scene } = useThree();
+  const [objs, setObjs] = useState([]);
+  const [newMat, setNewMat] = useState(null);
+
+  const defaultMat = new MeshStandardMaterial({ color: 0x808080 });
+
   if (!renderTargetRef.current) {
     renderTargetRef.current = new WebGLMultipleRenderTargets(
       size.width * 2,
@@ -110,48 +114,65 @@ const MyScene = ({ objFiles, pngFiles, params, renderTargetRef }) => {
     renderTargetRef.current.setSize(size.width * 2, size.height * 2);
   }, [size]);
 
-  const objs = objFiles.map((path) => useLoader(OBJLoader, path));
-  const textures = pngFiles.map((path) => {
-    const texture = new TextureLoader().load(path);
-    texture.magFilter = NearestFilter;
-    texture.minFilter = NearestFilter;
-    return texture;
-  });
+  useEffect(() => {
+    const loader = new OBJLoader();
+    const loadModel = (path) =>
+      new Promise((resolve) => {
+        loader.load(path, resolve);
+      });
+    const paths = objFiles;
+    Promise.all(paths.map(loadModel)).then(setObjs).catch(console.error);
+  }, [objFiles, scene]);
 
-  const uniforms = textures.reduce((acc, curr, idx) => {
-    acc[`tDiffuse${idx}`] = { value: curr };
-    return acc;
-  }, {});
+  useEffect(() => {
+    const textures = pngFiles.map((path) => {
+      const texture = new TextureLoader().load(path);
+      texture.magFilter = NearestFilter;
+      texture.minFilter = NearestFilter;
+      return texture;
+    });
 
-  let newmat = new RawShaderMaterial({
-    side: DoubleSide,
-    vertexShader: vertexShader,
-    fragmentShader: fragmentShader,
-    uniforms,
-    glslVersion: GLSL3,
-  });
+    const uniforms = textures.reduce((acc, curr, idx) => {
+      acc[`tDiffuse${idx}`] = { value: curr };
+      return acc;
+    }, {});
 
-  const group = new Group();
-  objs.forEach((model) => {
-    if (model.children.length > 0) {
-      group.add(model.children[0]);
-    }
-  });
-  group.children.forEach((child) => {
-    if (child instanceof Mesh && params.feature) {
-      child.material = newmat;
-    }
-  });
+    let newmat = new RawShaderMaterial({
+      side: DoubleSide,
+      vertexShader: vertexShader,
+      fragmentShader: fragmentShader,
+      uniforms,
+      glslVersion: GLSL3,
+    });
+
+    setNewMat(newmat);
+  }, [pngFiles]);
 
   return (
     <group>
-      <primitive object={group} />
+      {objs.map((obj, index) => {
+        obj.traverse((child) => {
+          if (child.isMesh) {
+            child.material = params.feature ? newMat : defaultMat;
+          }
+        });
+        return <primitive key={index} object={obj} />;
+      })}
     </group>
   );
 };
 
-function Viewer({ objFiles, pngFiles, jsonFile, params }) {
+function Loader() {
+  const { progress } = useProgress();
+  return <Html center>{progress} % loaded</Html>;
+}
+
+function Viewer() {
   const renderTargetRef = useRef();
+  const objFiles = useSelector(viewerSelectors.objFiles);
+  const pngFiles = useSelector(viewerSelectors.pngFiles);
+  const jsonFile = useSelector(viewerSelectors.jsonFile);
+  const params = useSelector(viewerSelectors.params);
   return (
     <Canvas
       gl={{
@@ -164,29 +185,24 @@ function Viewer({ objFiles, pngFiles, jsonFile, params }) {
         gl.setClearColor(new Color("rgb(0, 0, 0)"), 0.5);
       }}
     >
-      <ambientLight />
-      <pointLight position={[10, 10, 10]} />
-      <MyScene
-        objFiles={objFiles}
-        pngFiles={pngFiles}
-        params={params}
-        renderTargetRef={renderTargetRef}
-      />
-      <OrbitControls autoRotate enableZoom={false} enablePan={false} />
-      <PostProcessingScene
-        jsonFile={jsonFile}
-        params={params}
-        renderTargetRef={renderTargetRef}
-      />
+      <Suspense fallback={<Loader />}>
+        <ambientLight />
+        <pointLight position={[10, 10, 10]} />
+        <MyScene
+          objFiles={objFiles}
+          pngFiles={pngFiles}
+          params={params}
+          renderTargetRef={renderTargetRef}
+        />
+        <OrbitControls autoRotate enableZoom={false} enablePan={false} />
+        <PostProcessingScene
+          jsonFile={jsonFile}
+          params={params}
+          renderTargetRef={renderTargetRef}
+        />
+      </Suspense>
     </Canvas>
   );
 }
 
-const mapStateToProps = (state) => ({
-  objFiles: viewerSelectors.objFiles(state),
-  pngFiles: viewerSelectors.pngFiles(state),
-  jsonFile: viewerSelectors.jsonFile(state),
-  params: viewerSelectors.params(state),
-});
-
-export default connect(mapStateToProps, null)(Viewer);
+export default Viewer;
