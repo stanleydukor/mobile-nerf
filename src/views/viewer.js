@@ -181,9 +181,6 @@ function Viewer() {
         antialias: !params.aliasing,
         pixelRatio: 1,
       }}
-      onCreated={({ gl }) => {
-        gl.setClearColor(new Color("rgb(0, 0, 0)"), 0.5);
-      }}
     >
       <Suspense fallback={<Loader />}>
         <ambientLight />
