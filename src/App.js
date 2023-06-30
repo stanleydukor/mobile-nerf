@@ -66,18 +66,6 @@ function App({ objFiles, pngFiles, jsonFile, params, addFiles, handleChange }) {
                 <FormControlLabel
                   control={
                     <Switch
-                      name="mesh"
-                      onChange={handleChange}
-                      checked={params.mesh}
-                      color="primary"
-                    />
-                  }
-                  label="Mesh"
-                  labelPlacement="start"
-                />
-                <FormControlLabel
-                  control={
-                    <Switch
                       name="feature"
                       onChange={handleChange}
                       checked={params.feature}
